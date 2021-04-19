@@ -20,6 +20,10 @@ public class TopicListInterceptor {
     /**
      * Override the incomingRequestPreProcessed method, which is called
      * for each incoming request before any processing is done.
+     * 
+     * @param theRequest - the HttpServletRequest
+     * @param theResponse - the HttpServletResponse
+     * @return true when processing should continue as normal, false when interceptor is activated
      */
     @Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_PROCESSED)
     public boolean incomingRequestPreProcessed(HttpServletRequest theRequest, HttpServletResponse theResponse) {

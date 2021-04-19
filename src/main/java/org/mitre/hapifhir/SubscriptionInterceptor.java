@@ -66,6 +66,7 @@ public class SubscriptionInterceptor {
      * 
      * @param theRequestDetails - HAPI interceptor request details
      * @param theResource - the resource being returned by the request
+     * @return true when complete
      */
     @Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
     public boolean incomingRequestPostProcessed(RequestDetails theRequestDetails, IBaseResource theResource) {

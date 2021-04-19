@@ -25,7 +25,7 @@ public class CreateNotification {
      * @param baseUrl - the server base url
      * @param topicUrl - the canonical url of the topic
      * @param notificationType - R5 Subscription Notification Type Value Set
-     * @return
+     * @return the notification Bundle
      */
     public static Bundle createResourceNotification(Subscription subscription, List<Resource> resources,
       String baseUrl, String topicUrl, NotificationType notificationType) {
