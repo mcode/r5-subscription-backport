@@ -187,8 +187,10 @@ public class SubscriptionInterceptor {
                 continue;
             }
 
-            // Check Subscription criteria, if it does not match resource skip subscription
-            // TODO: check subscription criteria matches the resource
+            // Check at least one Subscription criteria matches resource, if not skip subscription
+            if (!SubscriptionHelper.matchesCriteria(subscription, theResource, this.searchClient)) {
+                continue;
+            }
 
             // If we get this far the topic and criteria matches
             subscriptions.add(subscription);

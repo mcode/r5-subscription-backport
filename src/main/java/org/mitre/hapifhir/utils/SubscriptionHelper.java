@@ -3,9 +3,13 @@ package org.mitre.hapifhir.utils;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4.model.Extension;
+import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.Subscription;
 import org.hl7.fhir.r4.model.UriType;
+import org.mitre.hapifhir.search.ISearchClient;
 
 public class SubscriptionHelper {
 
@@ -41,5 +45,30 @@ public class SubscriptionHelper {
         // TODO: get extra criteria from _criteria property
 
         return criteria;
+    }
+
+    /**
+     * Helper method to determine if a resource matches any of the criteria from a Subscription.
+     * Uses search client to get by criteria and validate the resource is in the Bundle.
+     * 
+     * @param subscription - the subscription to check criteria from
+     * @param theResource - the resource to check against
+     * @param searchClient - search client
+     * @return true if the resource matches at least one criteria, false otherwise
+     */
+    public static boolean matchesCriteria(Subscription subscription, Resource theResource, 
+      ISearchClient searchClient) {
+        for (String criteria : SubscriptionHelper.getCriteria(subscription)) {
+            Bundle searchBundle = searchClient.searchOnCriteria(criteria);
+            for (BundleEntryComponent entry : searchBundle.getEntry()) {
+                Resource resource = entry.getResource();
+                if (resource.getIdElement().getIdPart().equals(theResource.getIdElement().getIdPart())
+                    && resource.fhirType().equals(theResource.fhirType())) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
