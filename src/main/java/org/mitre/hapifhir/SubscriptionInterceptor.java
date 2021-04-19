@@ -7,7 +7,6 @@ import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.parser.IParser;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import ca.uhn.fhir.rest.client.api.IGenericClient;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -25,11 +24,13 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
+import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.Subscription;
 import org.mitre.hapifhir.model.ResourceTrigger;
 import org.mitre.hapifhir.model.ResourceTrigger.MethodCriteria;
 import org.mitre.hapifhir.model.SubscriptionTopic;
 import org.mitre.hapifhir.model.SubscriptionTopic.NotificationType;
+import org.mitre.hapifhir.search.ISearchClient;
 import org.mitre.hapifhir.utils.CreateNotification;
 import org.mitre.hapifhir.utils.SubscriptionHelper;
 import org.slf4j.Logger;
@@ -46,7 +47,7 @@ public class SubscriptionInterceptor {
     private String baseUrl;
     private IParser jparser;
     private FhirContext myCtx;
-    private IGenericClient client;
+    private ISearchClient searchClient;
     private List<SubscriptionTopic> subscriptionTopics;
 
     /**
@@ -54,13 +55,15 @@ public class SubscriptionInterceptor {
      * 
      * @param url - the server base url
      * @param ctx - the fhir context to use
+     * @param searchClient - the client used to search the server
      * @param subscriptionTopics - list of subscription topics this server supports
      */
-    public SubscriptionInterceptor(String url, FhirContext ctx, List<SubscriptionTopic> subscriptionTopics) {
+    public SubscriptionInterceptor(String url, FhirContext ctx, ISearchClient searchClient,
+      List<SubscriptionTopic> subscriptionTopics) {
         this.baseUrl = url;
         this.myCtx = ctx;
+        this.searchClient = searchClient;
         this.subscriptionTopics = subscriptionTopics;
-        this.client = this.myCtx.newRestfulGenericClient(this.baseUrl + "/fhir");
         this.jparser = this.myCtx.newJsonParser();
     }
 
@@ -78,10 +81,11 @@ public class SubscriptionInterceptor {
         // Determine which SubscriptionTopic, if any, should be triggered
         SubscriptionTopic subscriptionTopic = getSubscriptionTopic(theRequestDetails, theResource);
         if (subscriptionTopic != null) { 
+            myLogger.info("Checking subscriptions for topic " + subscriptionTopic.getName());
             // Find all subscriptions to be notified
             Resource resource = (Resource) theResource;
             String topicUrl = subscriptionTopic.getTopicUrl();
-            for (Subscription subscription: getSubscriptionToNotify(topicUrl, resource)) {
+            for (Subscription subscription: getSubscriptionsToNotify(topicUrl, resource)) {
                 Bundle notification = CreateNotification.createResourceNotification(subscription,
                   Collections.singletonList(resource), this.baseUrl, topicUrl,
                   NotificationType.EVENT_NOTIFICATION);
@@ -134,20 +138,20 @@ public class SubscriptionInterceptor {
     }
 
     /**
-     * Helper method to determine if the requestType matches the topic methodCriteria.
+     * Helper method to determine if the requestType matches any of the topic methodCriteria.
      * 
      * @param requestType - the current request type
      * @param methodCriteria - the topic method criteria
      * @param theResource - the resource from the request, used to check if a PUT is a CREATE
      * @return true if the requestType matches, false otherwise
      */
-    private boolean requestTypeMatches(RequestTypeEnum requestType, MethodCriteria methodCriteria,
+    private boolean requestTypeMatches(RequestTypeEnum requestType, List<MethodCriteria> methodCriteria,
       IBaseResource theResource) {
-        if (methodCriteria.equals(MethodCriteria.DELETE) && requestType.equals(RequestTypeEnum.DELETE)) {
+        if (methodCriteria.contains(MethodCriteria.DELETE) && requestType.equals(RequestTypeEnum.DELETE)) {
             return true;
-        } else if (methodCriteria.equals(MethodCriteria.UPDATE) && requestType.equals(RequestTypeEnum.PUT)) {
+        } else if (methodCriteria.contains(MethodCriteria.UPDATE) && requestType.equals(RequestTypeEnum.PUT)) {
             return true;
-        } else if (methodCriteria.equals(MethodCriteria.CREATE)) {
+        } else if (methodCriteria.contains(MethodCriteria.CREATE)) {
             if (requestType.equals(RequestTypeEnum.POST)) {
                 return true;
             } else if (requestType.equals(RequestTypeEnum.PUT)) {
@@ -165,9 +169,10 @@ public class SubscriptionInterceptor {
      * @param theResource - the triggering resource used to check subscription criteria
      * @return list of Subscription resource
      */
-    private List<Subscription> getSubscriptionToNotify(String topicUrl, Resource theResource) {
+    private List<Subscription> getSubscriptionsToNotify(String topicUrl, Resource theResource) {
         myLogger.info("Checking all active subscriptions for topic " + topicUrl);
-        Bundle results = SubscriptionHelper.searchOnCriteria(this.client, "/Subscription?status=active");
+        // TODO: set status to active when accepting subscriptions
+        Bundle results = this.searchClient.searchOnCriteria("Subscription");
         List<Subscription> subscriptions = new ArrayList<>(); 
         for (BundleEntryComponent entry: results.getEntry()) {
             Resource resource = entry.getResource();
@@ -188,6 +193,7 @@ public class SubscriptionInterceptor {
             // If we get this far the topic and criteria matches
             subscriptions.add(subscription);
         }
+        myLogger.info("Found " + subscriptions.size() + " subscriptions to notify.");
         return subscriptions;
     }
 
@@ -198,26 +204,39 @@ public class SubscriptionInterceptor {
      * @param notification - the notification bundle to send
      */
     private void sendNotification(Subscription subscription, Bundle notification) {
+        String subscriptionId = subscription.getIdElement().getIdPart();
         String endpoint = subscription.getChannel().getEndpoint();
-        myLogger.info("Sending notification for Subscription/" + subscription.getId() + " to " + endpoint);
+
+        if (endpoint == null) {
+            myLogger.error("UnsupportedChannelTypeException: Subscription/" + subscriptionId 
+                + " must be rest-hook and include channel.endpoint");
+            return;
+        }
+
+        myLogger.info("Sending notification for Subscription/" + subscriptionId + " to " + endpoint);
 
         try {
-            HttpClient httpClient = HttpClients.createDefault();
-            HttpPost httpPost = new HttpPost(endpoint);
-            // TODO: Add headers from the subscription
             StringEntity data = new StringEntity(jparser.setPrettyPrint(true)
               .encodeResourceToString(notification));
+            HttpPost httpPost = new HttpPost(endpoint);
             httpPost.setEntity(data);
-            httpPost.setHeader("Content-type", "application/json");
+            httpPost.addHeader("Content-type", "application/json");
+            for (StringType header : subscription.getChannel().getHeader()) {
+                String headerString = header.asStringValue();
+                String[] headerParts = headerString.split(": ", 2);
+                httpPost.addHeader(headerParts[0], headerParts[1]);
+            }
+            HttpClient httpClient = HttpClients.createDefault();
             httpClient.execute(httpPost);
         } catch (UnsupportedEncodingException e) {
-            myLogger.error("UnsupportedEncodingException sending notification", e);
+            myLogger.error("UnsupportedEncodingException sending notification for Subscription/"
+                + subscriptionId, e);
         } catch (ClientProtocolException e) {
-            myLogger.error("ClientProtocolException sending notification", e);
+            myLogger.error("ClientProtocolException sending notification for Subscription/" + subscriptionId, e);
         } catch (IOException e) {
-            myLogger.error("IOException sending notification", e);
+            myLogger.error("IOException sending notification for Subscription/" + subscriptionId, e);
         } catch (Exception e) {
-            myLogger.info("Error sending notification");
+            myLogger.info("Error sending notification for Subscription/" + subscriptionId);
         }
     }
 }

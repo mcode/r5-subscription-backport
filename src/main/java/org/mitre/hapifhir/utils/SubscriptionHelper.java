@@ -1,14 +1,11 @@
 package org.mitre.hapifhir.utils;
 
-import ca.uhn.fhir.rest.client.api.IGenericClient;
-
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Extension;
-import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.Subscription;
+import org.hl7.fhir.r4.model.UriType;
 
 public class SubscriptionHelper {
 
@@ -25,7 +22,7 @@ public class SubscriptionHelper {
         if (topicCanonicalExtension == null) {
             return null;
         }
-        StringType value = (StringType) topicCanonicalExtension.getValue();
+        UriType value = (UriType) topicCanonicalExtension.getValue();
         return value.asStringValue();
     }
 
@@ -42,23 +39,7 @@ public class SubscriptionHelper {
         criteria.add(subscription.getCriteria());
 
         // TODO: get extra criteria from _criteria property
-        // Property extraCriteriaProperty = subscription.getNamedProperty("_criteria");
-        // List<Base> extraCriteriaList = extraCriteriaProperty.getValues();
-        // for(Base extraCriteria : extraCriteriaList) {
-        // }
-        return criteria;
-    }
 
-    /**
-     * Helper method to search the server by criteria.
-     * 
-     * @param client - the fhir client used to perform the search
-     * @param criteria - the criteria string e.g. "Patient?id=123"
-     * @return the search bundle from the server
-     */
-    public static Bundle searchOnCriteria(IGenericClient client, String criteria) {
-        return client.search().byUrl(criteria)
-            .returnBundle(Bundle.class)
-            .execute();
+        return criteria;
     }
 }

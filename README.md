@@ -23,7 +23,7 @@ compile 'org.mitre.hapifhir:r5-subscription-backport:0.0.1'
 
 # Usage
 
-There are two interceptors included in this library to support the backport ig, `SubscriptionInterceptor` and `TopicListInterceptor`. These must be registered in the HAPI server and include a list of all `SubscriptionTopic`s supported.
+There are two interceptors included in this library to support the backport ig, `SubscriptionInterceptor` and `TopicListInterceptor`. These must be registered in the HAPI server and include a list of all `SubscriptionTopic`s supported. Furthermore, since this will take the place of the HAPI Subscription capabilites you will need to disable that.
 
 For example, using a JPA Starter HAPI FHIR Server:
 
@@ -31,6 +31,8 @@ For example, using a JPA Starter HAPI FHIR Server:
 
 import org.mitre.hapifhir.model.SubscriptionTopic;
 import org.mitre.hapifhir.model.ResourceTrigger;
+import org.mitre.hapifhir.search.ISearchClient;
+import org.mitre.hapifhir.search.NoAuthSearchClient;
 import org.mitre.hapifhir.SubscriptionInterceptor;
 import org.mitre.hapifhir.TopicListInterceptor;
 
@@ -46,8 +48,10 @@ public class JpaRestfulServer extends RestfulServer {
     SubscriptionTopic topic = new SubscriptionTopic(id, name, canonicalUrl, Collections.singletonList(resourceTrigger));
     subscriptionTopics.add(topic);
     ...
+    IGenericClient client = this.getFhirContext().newRestfulGenericClient(HapiProperties.getServerAddress());
+    ISearchClient searchClient = new NoAuthSearchClient(client);
     SubscriptionInterceptor subscriptionInterceptor =
-      new SubscriptionInterceptor(HapiProperties.getAuthServerAddress(), this.getFhirContext(), subscriptionTopics);
+      new SubscriptionInterceptor(HapiProperties.getAuthServerAddress(), this.getFhirContext(), searchClient, subscriptionTopics);
     this.registerInterceptor(subscriptionInterceptor);
     ...
     TopicListInterceptor topicListInterceptor =
@@ -56,7 +60,13 @@ public class JpaRestfulServer extends RestfulServer {
     ...
   }
 }
+```
 
+And in `hapi.properties`
+
+```
+# Disable REST Hook Subscription Channel
+subscription.resthook.enabled=false
 ```
 
 # Development
