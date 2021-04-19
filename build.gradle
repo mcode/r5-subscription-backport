@@ -25,13 +25,16 @@ dependencies {
 	api 'org.springframework:spring-web:5.2.1.RELEASE'
 	api 'org.json:json:20190722'
 	
+    api 'ca.uhn.hapi.fhir:hapi-fhir-base:4.1.0'
+    api 'ca.uhn.hapi.fhir:hapi-fhir-client:4.1.0'
 	api 'ca.uhn.hapi.fhir:hapi-fhir-server:4.1.0'
 	api 'ca.uhn.hapi.fhir:hapi-fhir-structures-r4:4.1.0'
 
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
 
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation 'com.google.guava:guava:29.0-jre'
+    // implementation 'com.google.guava:guava:29.0-jre'
 
     // Use JUnit test framework.
     testImplementation 'junit:junit:4.13'

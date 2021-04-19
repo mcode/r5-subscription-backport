@@ -1,113 +1,64 @@
 package org.mitre.hapifhir;
 
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+
+import org.hl7.fhir.r4.model.BaseReference;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.CanonicalType;
+import org.hl7.fhir.r4.model.Meta;
+import org.hl7.fhir.r4.model.Parameters;
+import org.hl7.fhir.r4.model.Reference;
+import org.hl7.fhir.r4.model.Resource;
+import org.hl7.fhir.r4.model.Subscription;
+import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.r4.model.Bundle.BundleType;
+import org.mitre.hapifhir.SubscriptionTopic.NotificationType;
 
 public class CreateNotification {
-    /**
-     *
-     * @return empty notification in string form NOTE: change document to history once complete
-     */
-    public static String createEmptyNotification(String subscription, String url) {
-          String notification = "{\"resourceType\" : \"Bundle\",\"id\" : \"notification-empty\","
-            + "\"meta\" : {\"profile\" : [\"http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscription-notification\"]},"
-            + "\"type\" : \"document\","
-            + "\"timestamp\" : \"2020-05-29T11:44:13.1882432-05:00\","
-            + "\"entry\" : [{"
-            + "\"fullUrl\" : \"urn:uuid:b21e4fae-ce73-45cb-8e37-1e203362b2ae\","
-            + "\"resource\" : {"
-            + "\"resourceType\" : \"Parameters\","
-            + "\"id\" : \"b21e4fae-ce73-45cb-8e37-1e203362b2ae\","
-            + "\"meta\" : {\"profile\" : ["
-            + "\"http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscriptionstatus\"]},"
-            + "\"parameter\" : [{"
-            + "\"name\" : \"subscription\","
-            + "\"valueReference\" : {"
-            + "\"reference\" : \"https://example.org/fhir/r4/Subscription/admission\"}},{"
-            + "\"name\" : \"topic\","
-            + "\"valueCanonical\" : \"http://hl7.org/SubscriptionTopic/admission\"},{"
-            + "\"name\" : \"type\","
-            + "\"valueCode\" : \"event-notification\"},"
-            + "{\"name\" : \"status\",\"valueCode\" : \"active\"},"
-            + "{\"name\" : \"events-since-subscription-start\",\"valueUnsignedInt\" : 310},"
-            + "{\"name\" : \"events-in-notification\",\"valueUnsignedInt\" : 1}]},"
-            + "\"request\" : {\"method\" : \"GET\",\"url\" : \"" + url + "\""
-            + "},\"response\" : {\"status\" : \"200\"}}]}";
-        return notification;
 
-    }
-    public static String createResourceNotification(String subscription, List<String> resources, String url) {
-          if (resources.size() == 0) {
-              return createEmptyNotification(subscription, url);
-          }
-          String str = "";
-          for (String r: resources) {
-              str += (r + ",");
-          }
-          if (resources.size() > 0) {
-              str = str.substring(0, str.length() - 1);
-          }
-          String notification = "{"
-            + "\"resourceType\" : \"Bundle\","
-            + "\"id\" : \"notification-full-resource\","
-            + "\"meta\" : {"
-            + "\"profile\" : ["
-            + "\"http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscription-notification\""
-            + "]"
-            + "},"
-            + "\"type\" : \"document\","
-            + "\"timestamp\" : \"2020-05-29T11:44:13.1882432-05:00\","
-            + "\"entry\" : ["
-            + "{"
-            + "\"fullUrl\" : \"urn:uuid:b21e4fae-ce73-45cb-8e37-1e203362b2ae\","
-            + "\"resource\" : {"
-            + "\"resourceType\" : \"Parameters\","
-            + "\"id\" : \"b21e4fae-ce73-45cb-8e37-1e203362b2ae\","
-            + "\"meta\" : {"
-            + "\"profile\" : ["
-            + "\"http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscriptionstatus\""
-            + "]"
-            + "},"
-            + "\"parameter\" : ["
-            + "{"
-            + "\"name\" : \"subscription\","
-            + "\"valueReference\" : {"
-            + "\"reference\" : \"https://example.org/fhir/r4/Subscription/admission\""
-            + "}"
-            + "},"
-            + "{"
-            + "\"name\" : \"topic\","
-            + "\"valueCanonical\" : \"http://hl7.org/SubscriptionTopic/admission\""
-            + "},"
-            + "{"
-            + "\"name\" : \"type\","
-            + "\"valueCode\" : \"event-notification\""
-            + "},"
-            + "{"
-            + "\"name\" : \"status\","
-            + "\"valueCode\" : \"active\""
-            + "},"
-            + "{"
-            + "\"name\" : \"events-since-subscription-start\","
-            + "\"valueUnsignedInt\" : 310"
-            + "},"
-            + "{"
-            + "\"name\" : \"events-in-notification\","
-            + "\"valueUnsignedInt\" : 1"
-            + "}"
-            + "]"
-            + "},"
-            + "\"request\" : {"
-            + "\"method\" : \"GET\","
-            + "\"url\" : \"" + url + "\""
-            + "},"
-            + "\"response\" : {"
-            + "\"status\" : \"200\""
-            + "}"
-            + "},"
-            + str
-            + "]"
-            + "}";
-        return notification;
+    /**
+     * Create an R5 Backport Notification
+     * 
+     * @param subscription - the subscription to notify
+     * @param resources - list of resources to include (empty or null for empty notification)
+     * @param baseUrl - the server base url
+     * @param topicUrl - the canonical url of the topic
+     * @param notificationType - R5 Subscription Notification Type Value Set
+     * @return
+     */
+    public static Bundle createResourceNotification(Subscription subscription, List<Resource> resources, String baseUrl, String topicUrl, NotificationType notificationType) {
+        Meta meta = new Meta();
+        meta.addProfile("http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscription-notification");
+
+        String subscriptionFullUrl = baseUrl + "/Subscription/" + subscription.getId();
+        Parameters parameters = new Parameters();
+        BaseReference subscriptionReference = new Reference(subscriptionFullUrl);
+        parameters.addParameter("subscription", subscriptionReference);
+        parameters.addParameter("topic", new CanonicalType(topicUrl));
+        parameters.addParameter("type", notificationType.toCoding().getCodeElement());
+
+        BundleEntryComponent subscriptionStatusComponent = new BundleEntryComponent();
+        subscriptionStatusComponent.setResource(parameters);
+        subscriptionStatusComponent.setFullUrl(subscriptionFullUrl);
+
+        Bundle notificationBundle = new Bundle();
+        notificationBundle.setType(BundleType.DOCUMENT);
+        notificationBundle.setMeta(meta);
+        notificationBundle.setTimestamp(new Date());
+        notificationBundle.addEntry(subscriptionStatusComponent);
+
+        // TODO: support id-only notifications
+        if (resources != null && !resources.isEmpty()) {
+            for (Resource r : resources) {
+                BundleEntryComponent bec = new BundleEntryComponent();
+                bec.setResource(r);
+                bec.setFullUrl(baseUrl + "/" + r.fhirType() + "/" + r.getId());
+                notificationBundle.addEntry(bec);
+            }
+        }
+
+        return notificationBundle;
     }
 }
 
