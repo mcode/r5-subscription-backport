@@ -1,4 +1,4 @@
-package org.mitre.hapifhir;
+package org.mitre.hapifhir.model;
 
 import java.util.List;
 
@@ -26,6 +26,7 @@ public class SubscriptionTopic {
     }
 
     private String id;
+    private String name;
     private String topicUrl;
     private List<ResourceTrigger> resourceTriggers;
 
@@ -33,17 +34,23 @@ public class SubscriptionTopic {
      * Create a new SubscriptionTopic object. 
      * 
      * @param id - the topic id
+     * @param name - the topic name
      * @param topicUrl - the topic canonical url
      * @param resourceTriggers - the list of resourceTriggers
      */
-    public SubscriptionTopic(String id, String topicUrl, List<ResourceTrigger> resourceTriggers) {
+    public SubscriptionTopic(String id, String name, String topicUrl, List<ResourceTrigger> resourceTriggers) {
         this.id = id;
+        this.name = name;
         this.topicUrl = topicUrl;
         this.resourceTriggers = resourceTriggers;
     }
 
     public String getId() {
         return this.id;
+    }
+
+    public String getName() {
+        return this.name;
     }
 
     public String getTopicUrl() {

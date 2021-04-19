@@ -1,4 +1,4 @@
-package org.mitre.hapifhir;
+package org.mitre.hapifhir.utils;
 
 import java.util.Date;
 import java.util.List;
@@ -13,7 +13,7 @@ import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.Subscription;
-import org.mitre.hapifhir.SubscriptionTopic.NotificationType;
+import org.mitre.hapifhir.model.SubscriptionTopic.NotificationType;
 
 public class CreateNotification {
 
