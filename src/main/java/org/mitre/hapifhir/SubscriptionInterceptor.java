@@ -1,5 +1,6 @@
 package org.mitre.hapifhir;
 
+import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
@@ -7,7 +8,6 @@ import ca.uhn.fhir.parser.IParser;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
-import ca.uhn.fhir.context.FhirContext;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -16,8 +16,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -25,17 +23,19 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4.model.InstantType;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.Subscription;
-import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
 import org.mitre.hapifhir.ResourceTrigger.MethodCriteria;
 import org.mitre.hapifhir.SubscriptionTopic.NotificationType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * R5 Backport Subscription Interceptor which checks every request
- * to see if a notification should be sent
+ * to see if a notification should be sent.
  */
 @Interceptor
 public class SubscriptionInterceptor {
@@ -46,18 +46,24 @@ public class SubscriptionInterceptor {
     private FhirContext myCtx;
     private IGenericClient client;
 
-   public SubscriptionInterceptor(String url, FhirContext ctx) {
+    /**
+     * Create a new interceptor.
+     * 
+     * @param url - the server base url
+     * @param ctx - the fhir context to use.
+     */
+    public SubscriptionInterceptor(String url, FhirContext ctx) {
         this.baseUrl = url;
         this.myCtx = ctx;
         this.client = this.myCtx.newRestfulGenericClient(this.baseUrl + "/fhir");
         this.jparser = this.myCtx.newJsonParser();
-   }
+    }
 
     /**
      * Override the incomingRequestPostProcessed method, which is called for
      * each request after processing is done.
-     *
      * NOTE: this may not be the best pointcut
+     * 
      * @param theRequestDetails - HAPI interceptor request details
      * @param theResource - the resource being returned by the request
      */
@@ -79,7 +85,7 @@ public class SubscriptionInterceptor {
     }
 
     /**
-     * Find the SubscriptionTopic, if any which is triggered by this request
+     * Find the SubscriptionTopic, if any which is triggered by this request.
      * 
      * @param theRequestDetails - HAPI interceptor request details
      * @param theResource - the resource being returned by the request
@@ -97,16 +103,22 @@ public class SubscriptionInterceptor {
             boolean isTopicMatch = false;
             for (ResourceTrigger resourceTrigger : subscriptionTopic.getResourceTriggers()) {
                 // If requestType does not match methodCriteria there is no resourceTrigger match
-                if (!requestTypeMatches(requestType, resourceTrigger.getMethodCriteria())) continue;
+                if (!requestTypeMatches(requestType, resourceTrigger.getMethodCriteria())) {
+                    continue;
+                }
 
                 // If resourceType does not match there is no resourceTrigger match
-                if (!resourceType.equals(resourceTrigger.getResourceType())) continue;
+                if (!resourceType.equals(resourceTrigger.getResourceType())) {
+                    continue;
+                }
 
                 // If we get here all criteria is met so the topic is a match
                 isTopicMatch = true;
             }
 
-            if (isTopicMatch) return subscriptionTopic;
+            if (isTopicMatch) {
+                return subscriptionTopic;
+            }
         }
 
         // None of the subscription topics match
@@ -114,7 +126,7 @@ public class SubscriptionInterceptor {
     }
 
     /**
-     * Helper method to determine if the requestType matches the topic methodCriteria
+     * Helper method to determine if the requestType matches the topic methodCriteria.
      * 
      * @param requestType - the current request type
      * @param methodCriteria - the topic method criteria
@@ -126,8 +138,9 @@ public class SubscriptionInterceptor {
         } else if (methodCriteria.equals(MethodCriteria.UPDATE) && requestType.equals(RequestTypeEnum.PUT)) {
             return true;
         } else if (methodCriteria.equals(MethodCriteria.CREATE)) {
-            if (requestType.equals(RequestTypeEnum.POST)) return true;
-            else if (requestType.equals(RequestTypeEnum.PUT)) {
+            if (requestType.equals(RequestTypeEnum.POST)) {
+                return true;
+            } else if (requestType.equals(RequestTypeEnum.PUT)) {
                 // TODO: Could be a CREATE or an UPDATE check version history
             }
         }
@@ -150,7 +163,9 @@ public class SubscriptionInterceptor {
         for (BundleEntryComponent entry: entries) {
             try {
                 Resource resource = entry.getResource();
-                if (resource.fhirType().equals("Subscription")) subscriptions.add((Subscription) resource);
+                if (resource.fhirType().equals("Subscription")) {
+                    subscriptions.add((Subscription) resource);
+                }
             } catch (Exception ex) {
                 myLogger.info("Failed to parse subscription");
             }
@@ -184,14 +199,15 @@ public class SubscriptionInterceptor {
             }
         }
         if (!resources.isEmpty()) {
-            return CreateNotification.createResourceNotification(subscription, resources, baseUrl, "topicUrl", NotificationType.EVENT_NOTIFICATION);
+            return CreateNotification.createResourceNotification(subscription, resources, baseUrl, "topicUrl",
+                NotificationType.EVENT_NOTIFICATION);
         }
 
         return null;
     }
 
     /**
-     * Send the notification to the subscriber
+     * Send the notification to the subscriber.
      * 
      * @param subscription - the subscription resource the notification is for
      * @param notification - the notification bundle to send
@@ -204,7 +220,8 @@ public class SubscriptionInterceptor {
             HttpClient httpClient = HttpClients.createDefault();
             HttpPost httpPost = new HttpPost(endpoint);
             // TODO: Add headers from the subscription
-            StringEntity data = new StringEntity(jparser.setPrettyPrint(true).encodeResourceToString(notification));
+            StringEntity data = new StringEntity(jparser.setPrettyPrint(true)
+              .encodeResourceToString(notification));
             httpPost.setEntity(data);
             httpPost.setHeader("Content-type", "application/json");
             httpClient.execute(httpPost);
@@ -214,7 +231,7 @@ public class SubscriptionInterceptor {
             myLogger.error("ClientProtocolException sending notification", e);
         } catch (IOException e) {
             myLogger.error("IOException sending notification", e);
-        } catch(Exception e) {
+        } catch (Exception e) {
             myLogger.info("Error sending notification");
         }
     }
@@ -240,7 +257,7 @@ public class SubscriptionInterceptor {
     }
 
     /**
-     * Helper method to search the server by criteria
+     * Helper method to search the server by criteria.
      * 
      * @param criteria - the criteria string e.g. "Patient?id=123"
      * @return the search bundle from the server

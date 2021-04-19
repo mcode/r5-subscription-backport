@@ -5,20 +5,20 @@ import java.util.List;
 
 import org.hl7.fhir.r4.model.BaseReference;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.r4.model.Bundle.BundleType;
 import org.hl7.fhir.r4.model.CanonicalType;
 import org.hl7.fhir.r4.model.Meta;
 import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.Subscription;
-import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r4.model.Bundle.BundleType;
 import org.mitre.hapifhir.SubscriptionTopic.NotificationType;
 
 public class CreateNotification {
 
     /**
-     * Create an R5 Backport Notification
+     * Create an R5 Backport Notification.
      * 
      * @param subscription - the subscription to notify
      * @param resources - list of resources to include (empty or null for empty notification)
@@ -27,7 +27,8 @@ public class CreateNotification {
      * @param notificationType - R5 Subscription Notification Type Value Set
      * @return
      */
-    public static Bundle createResourceNotification(Subscription subscription, List<Resource> resources, String baseUrl, String topicUrl, NotificationType notificationType) {
+    public static Bundle createResourceNotification(Subscription subscription, List<Resource> resources,
+      String baseUrl, String topicUrl, NotificationType notificationType) {
         Meta meta = new Meta();
         meta.addProfile("http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscription-notification");
 
