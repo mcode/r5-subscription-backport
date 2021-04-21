@@ -77,19 +77,21 @@ public class SubscriptionInterceptor {
      */
     @Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
     public boolean incomingRequestPostProcessed(RequestDetails theRequestDetails, IBaseResource theResource) {
-        // Determine which SubscriptionTopic, if any, should be triggered
-        SubscriptionTopic subscriptionTopic = getSubscriptionTopic(theRequestDetails, theResource);
-        if (subscriptionTopic != null) { 
-            myLogger.info("Checking subscriptions for topic " + subscriptionTopic.getName());
-            // Find all subscriptions to be notified
-            Resource resource = (Resource) theResource;
-            String topicUrl = subscriptionTopic.getTopicUrl();
-            for (Subscription subscription: getSubscriptionsToNotify(topicUrl, resource)) {
-                Bundle notification = CreateNotification.createResourceNotification(subscription,
-                  Collections.singletonList(resource), this.baseUrl, topicUrl,
-                  NotificationType.EVENT_NOTIFICATION);
-                if (notification != null) {
-                    sendNotification(subscription, notification);
+        // Determine which SubscriptionTopics, if any, should be triggered
+        List<SubscriptionTopic> matchedSubscriptionTopics = getSubscriptionTopics(theRequestDetails, theResource);
+        if (!matchedSubscriptionTopics.isEmpty()) { 
+            for (SubscriptionTopic subscriptionTopic : matchedSubscriptionTopics) {
+                myLogger.info("Checking subscriptions for topic " + subscriptionTopic.getName());
+                // Find all subscriptions to be notified
+                Resource resource = (Resource) theResource;
+                String topicUrl = subscriptionTopic.getTopicUrl();
+                for (Subscription subscription: getSubscriptionsToNotify(topicUrl, resource)) {
+                    Bundle notification = CreateNotification.createResourceNotification(subscription,
+                      Collections.singletonList(resource), this.baseUrl, topicUrl,
+                      NotificationType.EVENT_NOTIFICATION);
+                    if (notification != null) {
+                        sendNotification(subscription, notification);
+                    }
                 }
             }
         }
@@ -98,13 +100,15 @@ public class SubscriptionInterceptor {
     }
 
     /**
-     * Find the SubscriptionTopic, if any which is triggered by this request.
+     * Find the SubscriptionTopics, if any which is triggered by this request.
      * 
      * @param theRequestDetails - HAPI interceptor request details
      * @param theResource - the resource being returned by the request
-     * @return SubscriptionTopic which matches the current request, or null
+     * @return SubscriptionTopics which matches the current request
      */
-    private SubscriptionTopic getSubscriptionTopic(RequestDetails theRequestDetails, IBaseResource theResource) {
+    private List<SubscriptionTopic> getSubscriptionTopics(RequestDetails theRequestDetails, 
+      IBaseResource theResource) {
+        List<SubscriptionTopic> matchedTopics = new ArrayList<>();
         RequestTypeEnum requestType = theRequestDetails.getRequestType();
         ResourceType resourceType = ResourceType.fromCode(theResource.fhirType());
 
@@ -123,18 +127,25 @@ public class SubscriptionInterceptor {
                 if (!resourceType.equals(resourceTrigger.getResourceType())) {
                     continue;
                 }
+                
+                // If query criteria does not match there is no resourceTrigger match
+                String currentCriteria = resourceTrigger.getCurrentCriteria();
+                String queryCriteria = resourceType.name() + "?" + currentCriteria;
+                if (currentCriteria != null && !SubscriptionHelper.matchesCriteria(
+                  Collections.singletonList(queryCriteria), (Resource) theResource, this.searchClient)) {
+                    continue;
+                }
 
                 // If we get here all criteria is met so the topic is a match
                 isTopicMatch = true;
             }
 
             if (isTopicMatch) {
-                return subscriptionTopic;
+                matchedTopics.add(subscriptionTopic);
             }
         }
 
-        // None of the subscription topics match
-        return null;
+        return matchedTopics;
     }
 
     /**
@@ -164,7 +175,8 @@ public class SubscriptionInterceptor {
             }
 
             // Check at least one Subscription criteria matches resource, if not skip subscription
-            if (!SubscriptionHelper.matchesCriteria(subscription, theResource, this.searchClient)) {
+            if (!SubscriptionHelper.matchesCriteria(SubscriptionHelper.getCriteria(subscription), 
+              theResource, this.searchClient)) {
                 continue;
             }
 

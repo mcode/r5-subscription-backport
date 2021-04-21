@@ -78,18 +78,18 @@ public class SubscriptionHelper {
     }
 
     /**
-     * Helper method to determine if a resource matches any of the criteria from a Subscription.
-     * Uses search client to get by criteria and validate the resource is in the Bundle.
+     * Helper method to determine if a resource matches any of the criteria. Uses 
+     * search client to get by criteria and validate the resource is in the Bundle.
      * 
-     * @param subscription - the subscription to check criteria from
+     * @param criteria - list of criteria strings
      * @param theResource - the resource to check against
      * @param searchClient - search client
      * @return true if the resource matches at least one criteria, false otherwise
      */
-    public static boolean matchesCriteria(Subscription subscription, Resource theResource, 
+    public static boolean matchesCriteria(List<String> criteria, Resource theResource, 
       ISearchClient searchClient) {
-        for (String criteria : SubscriptionHelper.getCriteria(subscription)) {
-            String searchCriteria = criteria + "&_id=" + theResource.getIdElement().getIdPart();
+        for (String criterion : criteria) {
+            String searchCriteria = criterion + "&_id=" + theResource.getIdElement().getIdPart();
             Bundle searchBundle = searchClient.searchOnCriteria(searchCriteria);
             for (BundleEntryComponent entry : searchBundle.getEntry()) {
                 Resource resource = entry.getResource();
