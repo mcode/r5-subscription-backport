@@ -27,7 +27,6 @@ import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.Subscription;
 import org.mitre.hapifhir.model.ResourceTrigger;
-import org.mitre.hapifhir.model.ResourceTrigger.MethodCriteria;
 import org.mitre.hapifhir.model.SubscriptionTopic;
 import org.mitre.hapifhir.model.SubscriptionTopic.NotificationType;
 import org.mitre.hapifhir.search.ISearchClient;
@@ -115,7 +114,8 @@ public class SubscriptionInterceptor {
             boolean isTopicMatch = false;
             for (ResourceTrigger resourceTrigger : subscriptionTopic.getResourceTriggers()) {
                 // If requestType does not match methodCriteria there is no resourceTrigger match
-                if (!requestTypeMatches(requestType, resourceTrigger.getMethodCriteria(), theResource)) {
+                if (!SubscriptionHelper.requestTypeMatches(requestType, 
+                  resourceTrigger.getMethodCriteria(), theResource)) {
                     continue;
                 }
 
@@ -135,30 +135,6 @@ public class SubscriptionInterceptor {
 
         // None of the subscription topics match
         return null;
-    }
-
-    /**
-     * Helper method to determine if the requestType matches any of the topic methodCriteria.
-     * 
-     * @param requestType - the current request type
-     * @param methodCriteria - the topic method criteria
-     * @param theResource - the resource from the request, used to check if a PUT is a CREATE
-     * @return true if the requestType matches, false otherwise
-     */
-    private boolean requestTypeMatches(RequestTypeEnum requestType, List<MethodCriteria> methodCriteria,
-      IBaseResource theResource) {
-        if (methodCriteria.contains(MethodCriteria.DELETE) && requestType.equals(RequestTypeEnum.DELETE)) {
-            return true;
-        } else if (methodCriteria.contains(MethodCriteria.UPDATE) && requestType.equals(RequestTypeEnum.PUT)) {
-            return !theResource.getMeta().getVersionId().equals("1");
-        } else if (methodCriteria.contains(MethodCriteria.CREATE)) {
-            if (requestType.equals(RequestTypeEnum.POST)) {
-                return true;
-            } else if (requestType.equals(RequestTypeEnum.PUT)) {
-                return theResource.getMeta().getVersionId().equals("1");
-            }
-        }
-        return false;
     }
 
     /**

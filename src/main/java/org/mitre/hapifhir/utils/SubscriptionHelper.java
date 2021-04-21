@@ -1,14 +1,18 @@
 package org.mitre.hapifhir.utils;
 
+import ca.uhn.fhir.rest.api.RequestTypeEnum;
+
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.Subscription;
 import org.hl7.fhir.r4.model.UriType;
+import org.mitre.hapifhir.model.ResourceTrigger.MethodCriteria;
 import org.mitre.hapifhir.search.ISearchClient;
 
 public class SubscriptionHelper {
@@ -45,6 +49,32 @@ public class SubscriptionHelper {
         // TODO: get extra criteria from _criteria property
 
         return criteria;
+    }
+
+    /**
+     * Helper method to determine if the requestType matches any of the topic methodCriteria.
+     * 
+     * @param requestType - the current request type
+     * @param methodCriteria - the topic method criteria
+     * @param theResource - the resource from the request, used to check if a PUT is a CREATE
+     * @return true if the requestType matches, false otherwise
+     */
+    public static boolean requestTypeMatches(RequestTypeEnum requestType, List<MethodCriteria> methodCriteria,
+      IBaseResource theResource) {
+        if (methodCriteria.contains(MethodCriteria.DELETE) && requestType.equals(RequestTypeEnum.DELETE)) {
+            return true;
+        } else if (methodCriteria.contains(MethodCriteria.UPDATE) && requestType.equals(RequestTypeEnum.PUT)) {
+            // According to the valueset an UPDATE is an update or create
+            // https://build.fhir.org/valueset-interaction-trigger.html
+            return true;
+        } else if (methodCriteria.contains(MethodCriteria.CREATE)) {
+            if (requestType.equals(RequestTypeEnum.POST)) {
+                return true;
+            } else if (requestType.equals(RequestTypeEnum.PUT)) {
+                return theResource.getMeta().getVersionId().equals("1");
+            }
+        }
+        return false;
     }
 
     /**
