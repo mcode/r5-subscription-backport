@@ -150,7 +150,7 @@ public class SubscriptionInterceptor {
         if (methodCriteria.contains(MethodCriteria.DELETE) && requestType.equals(RequestTypeEnum.DELETE)) {
             return true;
         } else if (methodCriteria.contains(MethodCriteria.UPDATE) && requestType.equals(RequestTypeEnum.PUT)) {
-            return true;
+            return !theResource.getMeta().getVersionId().equals("1");
         } else if (methodCriteria.contains(MethodCriteria.CREATE)) {
             if (requestType.equals(RequestTypeEnum.POST)) {
                 return true;

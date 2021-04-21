@@ -59,7 +59,8 @@ public class SubscriptionHelper {
     public static boolean matchesCriteria(Subscription subscription, Resource theResource, 
       ISearchClient searchClient) {
         for (String criteria : SubscriptionHelper.getCriteria(subscription)) {
-            Bundle searchBundle = searchClient.searchOnCriteria(criteria);
+            String searchCriteria = criteria + "&_id=" + theResource.getIdElement().getIdPart();
+            Bundle searchBundle = searchClient.searchOnCriteria(searchCriteria);
             for (BundleEntryComponent entry : searchBundle.getEntry()) {
                 Resource resource = entry.getResource();
                 if (resource.getIdElement().getIdPart().equals(theResource.getIdElement().getIdPart())
