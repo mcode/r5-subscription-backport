@@ -2,6 +2,7 @@ package org.mitre.hapifhir.utils;
 
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 import org.hl7.fhir.r4.model.BaseReference;
 import org.hl7.fhir.r4.model.Bundle;
@@ -33,8 +34,10 @@ public class CreateNotification {
         Meta meta = new Meta();
         meta.addProfile("http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscription-notification");
 
-        String subscriptionFullUrl = baseUrl + "/Subscription/" + subscription.getId();
+        String subscriptionFullUrl = baseUrl + "/Subscription/" + subscription.getIdElement().getIdPart();
         Parameters parameters = new Parameters();
+        String parametersId = UUID.randomUUID().toString();
+        parameters.setId(parametersId);
         BaseReference subscriptionReference = new Reference(subscriptionFullUrl);
         parameters.addParameter("subscription", subscriptionReference);
         parameters.addParameter("topic", new CanonicalType(topicUrl));
@@ -43,7 +46,7 @@ public class CreateNotification {
 
         BundleEntryComponent subscriptionStatusComponent = new BundleEntryComponent();
         subscriptionStatusComponent.setResource(parameters);
-        subscriptionStatusComponent.setFullUrl(subscriptionFullUrl);
+        subscriptionStatusComponent.setFullUrl("urn:uuid:" + parametersId);
 
         Bundle notificationBundle = new Bundle();
         notificationBundle.setType(BundleType.DOCUMENT);
