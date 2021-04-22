@@ -27,6 +27,7 @@ import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.Subscription;
+import org.hl7.fhir.r4.model.Subscription.SubscriptionChannelType;
 import org.hl7.fhir.r4.model.Subscription.SubscriptionStatus;
 import org.mitre.hapifhir.client.IServerClient;
 import org.mitre.hapifhir.model.ResourceTrigger;
@@ -84,8 +85,14 @@ public class SubscriptionInterceptor {
                     Subscription subscription = 
                         this.jparser.parseResource(Subscription.class, theRequestDetails.getReader());
                     if (subscription.getStatus().equals(SubscriptionStatus.REQUESTED)) {
-                        subscription.setStatus(SubscriptionStatus.ACTIVE);
-                        myLogger.info(subscription.getId() + " status set to active.");
+                        if (subscription.getChannel().getType().equals(SubscriptionChannelType.RESTHOOK)) {
+                            subscription.setStatus(SubscriptionStatus.ACTIVE);
+                            myLogger.info(subscription.getId() + " status set to active.");
+                        } else {
+                            subscription.setStatus(SubscriptionStatus.ERROR);
+                            myLogger.info(subscription.getId() 
+                                + " requested with invalid channel. Currently only rest hook supported.");
+                        }
                     }
 
                     // The line above which parses the resource consumes the input strean so we must
