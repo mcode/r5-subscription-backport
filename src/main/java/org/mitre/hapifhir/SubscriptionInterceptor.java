@@ -10,7 +10,6 @@ import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,15 +23,15 @@ import org.apache.http.impl.client.HttpClients;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r4.model.Subscription.SubscriptionStatus;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.Subscription;
+import org.hl7.fhir.r4.model.Subscription.SubscriptionStatus;
+import org.mitre.hapifhir.client.IServerClient;
 import org.mitre.hapifhir.model.ResourceTrigger;
 import org.mitre.hapifhir.model.SubscriptionTopic;
 import org.mitre.hapifhir.model.SubscriptionTopic.NotificationType;
-import org.mitre.hapifhir.search.ISearchClient;
 import org.mitre.hapifhir.utils.CreateNotification;
 import org.mitre.hapifhir.utils.SubscriptionHelper;
 import org.slf4j.Logger;
@@ -49,7 +48,7 @@ public class SubscriptionInterceptor {
     private String baseUrl;
     private IParser jparser;
     private FhirContext myCtx;
-    private ISearchClient searchClient;
+    private IServerClient serverClient;
     private List<SubscriptionTopic> subscriptionTopics;
 
     /**
@@ -57,14 +56,14 @@ public class SubscriptionInterceptor {
      * 
      * @param url - the server base url
      * @param ctx - the fhir context to use
-     * @param searchClient - the client used to search the server
+     * @param serverClient - the client used to interact with the server
      * @param subscriptionTopics - list of subscription topics this server supports
      */
-    public SubscriptionInterceptor(String url, FhirContext ctx, ISearchClient searchClient,
+    public SubscriptionInterceptor(String url, FhirContext ctx, IServerClient serverClient,
       List<SubscriptionTopic> subscriptionTopics) {
         this.baseUrl = url;
         this.myCtx = ctx;
-        this.searchClient = searchClient;
+        this.serverClient = serverClient;
         this.subscriptionTopics = subscriptionTopics;
         this.jparser = this.myCtx.newJsonParser();
     }
@@ -86,10 +85,13 @@ public class SubscriptionInterceptor {
                         this.jparser.parseResource(Subscription.class, theRequestDetails.getReader());
                     if (subscription.getStatus().equals(SubscriptionStatus.REQUESTED)) {
                         subscription.setStatus(SubscriptionStatus.ACTIVE);
-                        String newInputStream = this.jparser.encodeResourceToString(subscription);
-                        theRequestDetails.setRequestContents(newInputStream.getBytes());
                         myLogger.info(subscription.getId() + " status set to active.");
                     }
+
+                    // The line above which parses the resource consumes the input strean so we must
+                    // reset it again for handlers down the line
+                    String newInputStream = this.jparser.encodeResourceToString(subscription);
+                    theRequestDetails.setRequestContents(newInputStream.getBytes());
                 } catch (DataFormatException | IOException e) {
                     myLogger.error("Error reading requested Subscription from stream", e);
                 }
@@ -163,7 +165,7 @@ public class SubscriptionInterceptor {
                 String currentCriteria = resourceTrigger.getCurrentCriteria();
                 String queryCriteria = resourceType.name() + "?" + currentCriteria;
                 if (currentCriteria != null && !SubscriptionHelper.matchesCriteria(
-                  Collections.singletonList(queryCriteria), (Resource) theResource, this.searchClient)) {
+                  Collections.singletonList(queryCriteria), (Resource) theResource, this.serverClient)) {
                     continue;
                 }
 
@@ -189,7 +191,7 @@ public class SubscriptionInterceptor {
      */
     private List<Subscription> getSubscriptionsToNotify(String topicUrl, Resource theResource) {
         myLogger.info("Checking all active subscriptions for topic " + topicUrl);
-        Bundle results = this.searchClient.searchOnCriteria("Subscription?status=active");
+        Bundle results = this.serverClient.searchOnCriteria("Subscription?status=active");
         List<Subscription> subscriptions = new ArrayList<>(); 
         for (BundleEntryComponent entry: results.getEntry()) {
             Resource resource = entry.getResource();
@@ -206,7 +208,7 @@ public class SubscriptionInterceptor {
 
             // Check at least one Subscription criteria matches resource, if not skip subscription
             if (!SubscriptionHelper.matchesCriteria(SubscriptionHelper.getCriteria(subscription), 
-              theResource, this.searchClient)) {
+              theResource, this.serverClient)) {
                 continue;
             }
 
@@ -251,12 +253,16 @@ public class SubscriptionInterceptor {
         } catch (UnsupportedEncodingException e) {
             myLogger.error("UnsupportedEncodingException sending notification for Subscription/"
                 + subscriptionId, e);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         } catch (ClientProtocolException e) {
             myLogger.error("ClientProtocolException sending notification for Subscription/" + subscriptionId, e);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         } catch (IOException e) {
             myLogger.error("IOException sending notification for Subscription/" + subscriptionId, e);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         } catch (Exception e) {
             myLogger.info("Error sending notification for Subscription/" + subscriptionId);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         }
     }
 }

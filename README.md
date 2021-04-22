@@ -31,8 +31,8 @@ For example, using a JPA Starter HAPI FHIR Server:
 
 import org.mitre.hapifhir.model.SubscriptionTopic;
 import org.mitre.hapifhir.model.ResourceTrigger;
-import org.mitre.hapifhir.search.ISearchClient;
-import org.mitre.hapifhir.search.NoAuthSearchClient;
+import org.mitre.hapifhir.client.IServerClient;
+import org.mitre.hapifhir.client.NoAuthServerClient;
 import org.mitre.hapifhir.SubscriptionInterceptor;
 import org.mitre.hapifhir.TopicListInterceptor;
 
@@ -49,9 +49,9 @@ public class JpaRestfulServer extends RestfulServer {
     subscriptionTopics.add(topic);
     ...
     IGenericClient client = this.getFhirContext().newRestfulGenericClient(HapiProperties.getServerAddress());
-    ISearchClient searchClient = new NoAuthSearchClient(client);
+    IServerClient serverClient = new NoAuthServerClient(client);
     SubscriptionInterceptor subscriptionInterceptor =
-      new SubscriptionInterceptor(HapiProperties.getAuthServerAddress(), this.getFhirContext(), searchClient, subscriptionTopics);
+      new SubscriptionInterceptor(HapiProperties.getAuthServerAddress(), this.getFhirContext(), serverClient, subscriptionTopics);
     this.registerInterceptor(subscriptionInterceptor);
     ...
     TopicListInterceptor topicListInterceptor =

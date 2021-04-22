@@ -11,9 +11,10 @@ import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.Subscription;
+import org.hl7.fhir.r4.model.Subscription.SubscriptionStatus;
 import org.hl7.fhir.r4.model.UriType;
+import org.mitre.hapifhir.client.IServerClient;
 import org.mitre.hapifhir.model.ResourceTrigger.MethodCriteria;
-import org.mitre.hapifhir.search.ISearchClient;
 
 public class SubscriptionHelper {
 
@@ -83,14 +84,14 @@ public class SubscriptionHelper {
      * 
      * @param criteria - list of criteria strings
      * @param theResource - the resource to check against
-     * @param searchClient - search client
+     * @param serverClient - server client
      * @return true if the resource matches at least one criteria, false otherwise
      */
     public static boolean matchesCriteria(List<String> criteria, Resource theResource, 
-      ISearchClient searchClient) {
+      IServerClient serverClient) {
         for (String criterion : criteria) {
             String searchCriteria = criterion + "&_id=" + theResource.getIdElement().getIdPart();
-            Bundle searchBundle = searchClient.searchOnCriteria(searchCriteria);
+            Bundle searchBundle = serverClient.searchOnCriteria(searchCriteria);
             for (BundleEntryComponent entry : searchBundle.getEntry()) {
                 Resource resource = entry.getResource();
                 if (resource.getIdElement().getIdPart().equals(theResource.getIdElement().getIdPart())
@@ -102,4 +103,15 @@ public class SubscriptionHelper {
 
         return false;
     }
+
+    /**
+     * Helper method to set the subscription status to error and save to the server.
+     * 
+     * @param subscription - the Subscription resource to update
+     * @param serverClient - server client
+     */
+    public static void setSubscriptionError(Subscription subscription, IServerClient serverClient) {
+        subscription.setStatus(SubscriptionStatus.ERROR);
+        serverClient.updateResource(subscription);
+    } 
 }
