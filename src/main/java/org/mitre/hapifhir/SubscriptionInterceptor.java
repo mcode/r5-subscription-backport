@@ -4,11 +4,13 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
+import ca.uhn.fhir.parser.DataFormatException;
 import ca.uhn.fhir.parser.IParser;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,6 +24,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.r4.model.Subscription.SubscriptionStatus;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.StringType;
@@ -67,16 +70,44 @@ public class SubscriptionInterceptor {
     }
 
     /**
-     * Override the incomingRequestPostProcessed method, which is called for
-     * each request after processing is done.
-     * NOTE: this may not be the best pointcut
+     * Hook for server incoming request post processed pointcut. This handles
+     * setting a requested subscription status to active. 
+     * 
+     * @param theRequestDetails - HAPI interceptor request details
+     */
+    @Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
+    public void processSubscriptions(RequestDetails theRequestDetails) {
+        String resourceName = theRequestDetails.getResourceName();
+        if (resourceName != null && resourceName.equals("Subscription")) {
+            RequestTypeEnum requestType = theRequestDetails.getRequestType();
+            if (requestType.equals(RequestTypeEnum.POST) || requestType.equals(RequestTypeEnum.PUT)) {
+                try {
+                    Subscription subscription = 
+                        this.jparser.parseResource(Subscription.class, theRequestDetails.getReader());
+                    if (subscription.getStatus().equals(SubscriptionStatus.REQUESTED)) {
+                        subscription.setStatus(SubscriptionStatus.ACTIVE);
+                        String newInputStream = this.jparser.encodeResourceToString(subscription);
+                        theRequestDetails.setRequestContents(newInputStream.getBytes());
+                        myLogger.info(subscription.getId() + " status set to active.");
+                    }
+                } catch (DataFormatException | IOException e) {
+                    myLogger.error("Error reading requested Subscription from stream", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Hook for server outgoing response pointcut. This handles checking
+     * if any subscriptions need to be notified. At this pointcut the 
+     * resource is accessible and all HAPI processing is complete.
      * 
      * @param theRequestDetails - HAPI interceptor request details
      * @param theResource - the resource being returned by the request
      * @return true when complete
      */
     @Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
-    public boolean incomingRequestPostProcessed(RequestDetails theRequestDetails, IBaseResource theResource) {
+    public boolean outgoingResponse(RequestDetails theRequestDetails, IBaseResource theResource) {
         // Determine which SubscriptionTopics, if any, should be triggered
         List<SubscriptionTopic> matchedSubscriptionTopics = getSubscriptionTopics(theRequestDetails, theResource);
         if (!matchedSubscriptionTopics.isEmpty()) { 
@@ -158,8 +189,7 @@ public class SubscriptionInterceptor {
      */
     private List<Subscription> getSubscriptionsToNotify(String topicUrl, Resource theResource) {
         myLogger.info("Checking all active subscriptions for topic " + topicUrl);
-        // TODO: set status to active when accepting subscriptions
-        Bundle results = this.searchClient.searchOnCriteria("Subscription");
+        Bundle results = this.searchClient.searchOnCriteria("Subscription?status=active");
         List<Subscription> subscriptions = new ArrayList<>(); 
         for (BundleEntryComponent entry: results.getEntry()) {
             Resource resource = entry.getResource();
