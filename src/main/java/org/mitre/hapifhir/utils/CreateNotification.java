@@ -8,6 +8,7 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4.model.Bundle.BundleType;
 import org.hl7.fhir.r4.model.CanonicalType;
+import org.hl7.fhir.r4.model.CodeType;
 import org.hl7.fhir.r4.model.Meta;
 import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.Reference;
@@ -37,6 +38,7 @@ public class CreateNotification {
         BaseReference subscriptionReference = new Reference(subscriptionFullUrl);
         parameters.addParameter("subscription", subscriptionReference);
         parameters.addParameter("topic", new CanonicalType(topicUrl));
+        parameters.addParameter("status", new CodeType(subscription.getStatus().toCode()));
         parameters.addParameter("type", notificationType.toCoding().getCodeElement());
 
         BundleEntryComponent subscriptionStatusComponent = new BundleEntryComponent();
