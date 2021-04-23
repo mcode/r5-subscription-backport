@@ -4,6 +4,7 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
+import ca.uhn.fhir.parser.DataFormatException;
 import ca.uhn.fhir.parser.IParser;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
@@ -26,10 +27,12 @@ import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.Subscription;
+import org.hl7.fhir.r4.model.Subscription.SubscriptionChannelType;
+import org.hl7.fhir.r4.model.Subscription.SubscriptionStatus;
+import org.mitre.hapifhir.client.IServerClient;
 import org.mitre.hapifhir.model.ResourceTrigger;
 import org.mitre.hapifhir.model.SubscriptionTopic;
 import org.mitre.hapifhir.model.SubscriptionTopic.NotificationType;
-import org.mitre.hapifhir.search.ISearchClient;
 import org.mitre.hapifhir.utils.CreateNotification;
 import org.mitre.hapifhir.utils.SubscriptionHelper;
 import org.slf4j.Logger;
@@ -46,7 +49,7 @@ public class SubscriptionInterceptor {
     private String baseUrl;
     private IParser jparser;
     private FhirContext myCtx;
-    private ISearchClient searchClient;
+    private IServerClient serverClient;
     private List<SubscriptionTopic> subscriptionTopics;
 
     /**
@@ -54,29 +57,66 @@ public class SubscriptionInterceptor {
      * 
      * @param url - the server base url
      * @param ctx - the fhir context to use
-     * @param searchClient - the client used to search the server
+     * @param serverClient - the client used to interact with the server
      * @param subscriptionTopics - list of subscription topics this server supports
      */
-    public SubscriptionInterceptor(String url, FhirContext ctx, ISearchClient searchClient,
+    public SubscriptionInterceptor(String url, FhirContext ctx, IServerClient serverClient,
       List<SubscriptionTopic> subscriptionTopics) {
         this.baseUrl = url;
         this.myCtx = ctx;
-        this.searchClient = searchClient;
+        this.serverClient = serverClient;
         this.subscriptionTopics = subscriptionTopics;
         this.jparser = this.myCtx.newJsonParser();
     }
 
     /**
-     * Override the incomingRequestPostProcessed method, which is called for
-     * each request after processing is done.
-     * NOTE: this may not be the best pointcut
+     * Hook for server incoming request post processed pointcut. This handles
+     * setting a requested subscription status to active. 
+     * 
+     * @param theRequestDetails - HAPI interceptor request details
+     */
+    @Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
+    public void processSubscriptions(RequestDetails theRequestDetails) {
+        String resourceName = theRequestDetails.getResourceName();
+        if (resourceName != null && resourceName.equals("Subscription")) {
+            RequestTypeEnum requestType = theRequestDetails.getRequestType();
+            if (requestType.equals(RequestTypeEnum.POST) || requestType.equals(RequestTypeEnum.PUT)) {
+                try {
+                    Subscription subscription = 
+                        this.jparser.parseResource(Subscription.class, theRequestDetails.getReader());
+                    if (subscription.getStatus().equals(SubscriptionStatus.REQUESTED)) {
+                        if (subscription.getChannel().getType().equals(SubscriptionChannelType.RESTHOOK)) {
+                            subscription.setStatus(SubscriptionStatus.ACTIVE);
+                            myLogger.info(subscription.getId() + " status set to active.");
+                        } else {
+                            subscription.setStatus(SubscriptionStatus.ERROR);
+                            myLogger.info(subscription.getId() 
+                                + " requested with invalid channel. Currently only rest hook supported.");
+                        }
+                    }
+
+                    // The line above which parses the resource consumes the input strean so we must
+                    // reset it again for handlers down the line
+                    String newInputStream = this.jparser.encodeResourceToString(subscription);
+                    theRequestDetails.setRequestContents(newInputStream.getBytes());
+                } catch (DataFormatException | IOException e) {
+                    myLogger.error("Error reading requested Subscription from stream", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Hook for server outgoing response pointcut. This handles checking
+     * if any subscriptions need to be notified. At this pointcut the 
+     * resource is accessible and all HAPI processing is complete.
      * 
      * @param theRequestDetails - HAPI interceptor request details
      * @param theResource - the resource being returned by the request
      * @return true when complete
      */
     @Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
-    public boolean incomingRequestPostProcessed(RequestDetails theRequestDetails, IBaseResource theResource) {
+    public boolean outgoingResponse(RequestDetails theRequestDetails, IBaseResource theResource) {
         // Determine which SubscriptionTopics, if any, should be triggered
         List<SubscriptionTopic> matchedSubscriptionTopics = getSubscriptionTopics(theRequestDetails, theResource);
         if (!matchedSubscriptionTopics.isEmpty()) { 
@@ -132,7 +172,7 @@ public class SubscriptionInterceptor {
                 String currentCriteria = resourceTrigger.getCurrentCriteria();
                 String queryCriteria = resourceType.name() + "?" + currentCriteria;
                 if (currentCriteria != null && !SubscriptionHelper.matchesCriteria(
-                  Collections.singletonList(queryCriteria), (Resource) theResource, this.searchClient)) {
+                  Collections.singletonList(queryCriteria), (Resource) theResource, this.serverClient)) {
                     continue;
                 }
 
@@ -158,8 +198,7 @@ public class SubscriptionInterceptor {
      */
     private List<Subscription> getSubscriptionsToNotify(String topicUrl, Resource theResource) {
         myLogger.info("Checking all active subscriptions for topic " + topicUrl);
-        // TODO: set status to active when accepting subscriptions
-        Bundle results = this.searchClient.searchOnCriteria("Subscription");
+        Bundle results = this.serverClient.searchOnCriteria("Subscription?status=active");
         List<Subscription> subscriptions = new ArrayList<>(); 
         for (BundleEntryComponent entry: results.getEntry()) {
             Resource resource = entry.getResource();
@@ -176,7 +215,7 @@ public class SubscriptionInterceptor {
 
             // Check at least one Subscription criteria matches resource, if not skip subscription
             if (!SubscriptionHelper.matchesCriteria(SubscriptionHelper.getCriteria(subscription), 
-              theResource, this.searchClient)) {
+              theResource, this.serverClient)) {
                 continue;
             }
 
@@ -221,12 +260,16 @@ public class SubscriptionInterceptor {
         } catch (UnsupportedEncodingException e) {
             myLogger.error("UnsupportedEncodingException sending notification for Subscription/"
                 + subscriptionId, e);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         } catch (ClientProtocolException e) {
             myLogger.error("ClientProtocolException sending notification for Subscription/" + subscriptionId, e);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         } catch (IOException e) {
             myLogger.error("IOException sending notification for Subscription/" + subscriptionId, e);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         } catch (Exception e) {
             myLogger.info("Error sending notification for Subscription/" + subscriptionId);
+            SubscriptionHelper.setSubscriptionError(subscription, this.serverClient);
         }
     }
 }

@@ -1,16 +1,16 @@
-package org.mitre.hapifhir.search;
+package org.mitre.hapifhir.client;
 
+import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
 
-public class BearerAuthSearchClient implements ISearchClient {
-   
-    private String token;
+public class NoAuthServerClient implements IServerClient {
+    
     private IGenericClient client;
 
-    public BearerAuthSearchClient(String token, IGenericClient client) {
-        this.token = token;
+    public NoAuthServerClient(IGenericClient client) {
         this.client = client;
     }
 
@@ -23,7 +23,17 @@ public class BearerAuthSearchClient implements ISearchClient {
     public Bundle searchOnCriteria(String criteria) {
         return client.search().byUrl(criteria)
             .returnBundle(Bundle.class)
-            .withAdditionalHeader("Authorization", "Bearer " + token)
+            .execute();
+    }
+
+    /**
+     * Updates a resource on the server defined by the client.
+     * 
+     * @param resource - the updated resource
+     * @return method outcome
+     */
+    public MethodOutcome updateResource(IBaseResource resource) {
+        return client.update().resource(resource)
             .execute();
     }
 }

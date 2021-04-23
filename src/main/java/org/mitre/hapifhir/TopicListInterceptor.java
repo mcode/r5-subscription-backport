@@ -54,7 +54,9 @@ public class TopicListInterceptor {
      */
     @Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_PROCESSED)
     public boolean incomingRequestPreProcessed(HttpServletRequest theRequest, HttpServletResponse theResponse) {
-        if (theRequest.getPathInfo().equals("/Subscription/$topic-list") && theRequest.getMethod().equals("GET")) {
+        if (theRequest.getPathInfo() != null 
+            && theRequest.getPathInfo().equals("/Subscription/$topic-list") 
+            && theRequest.getMethod().equals("GET")) {
             myLogger.info("Request received for $topic-list");
             try {
                 handleTopicList(theResponse);
