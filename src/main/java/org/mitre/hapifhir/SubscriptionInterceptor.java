@@ -118,19 +118,25 @@ public class SubscriptionInterceptor {
     @Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
     public boolean outgoingResponse(RequestDetails theRequestDetails, IBaseResource theResource) {
         // Determine which SubscriptionTopics, if any, should be triggered
-        List<SubscriptionTopic> matchedSubscriptionTopics = getSubscriptionTopics(theRequestDetails, theResource);
-        if (!matchedSubscriptionTopics.isEmpty()) { 
-            for (SubscriptionTopic subscriptionTopic : matchedSubscriptionTopics) {
-                myLogger.info("Checking subscriptions for topic " + subscriptionTopic.getName());
-                // Find all subscriptions to be notified
-                Resource resource = (Resource) theResource;
-                String topicUrl = subscriptionTopic.getTopicUrl();
-                for (Subscription subscription: getSubscriptionsToNotify(topicUrl, resource)) {
-                    Bundle notification = CreateNotification.createResourceNotification(subscription,
-                      Collections.singletonList(resource), this.baseUrl, topicUrl,
-                      NotificationType.EVENT_NOTIFICATION);
-                    if (notification != null) {
-                        sendNotification(subscription, notification);
+        RequestTypeEnum requestType = theRequestDetails.getRequestType();
+        if (requestType.equals(RequestTypeEnum.DELETE) 
+            || requestType.equals(RequestTypeEnum.POST) 
+            || requestType.equals(RequestTypeEnum.PUT)) {
+            List<SubscriptionTopic> matchedSubscriptionTopics = 
+              getSubscriptionTopics(theRequestDetails, theResource);
+            if (!matchedSubscriptionTopics.isEmpty()) { 
+                for (SubscriptionTopic subscriptionTopic : matchedSubscriptionTopics) {
+                    myLogger.info("Checking subscriptions for topic " + subscriptionTopic.getName());
+                    // Find all subscriptions to be notified
+                    Resource resource = (Resource) theResource;
+                    String topicUrl = subscriptionTopic.getTopicUrl();
+                    for (Subscription subscription: getSubscriptionsToNotify(topicUrl, resource)) {
+                        Bundle notification = CreateNotification.createResourceNotification(subscription,
+                          Collections.singletonList(resource), this.baseUrl, topicUrl,
+                          NotificationType.EVENT_NOTIFICATION);
+                        if (notification != null) {
+                            sendNotification(subscription, notification);
+                        }
                     }
                 }
             }

@@ -61,7 +61,7 @@ def mavenVersion = '0.0.1'
 
 publishing {
     publications {
-        smartBackendAuth(MavenPublication) {
+        r5SubscriptionBackport(MavenPublication) {
             groupId mavenGroup
             version mavenVersion
             from components.java
@@ -115,5 +115,5 @@ publishing {
 
 signing {
   required { project.hasProperty('signing.keyId') }
-  sign publishing.publications.smartBackendAuth
+  sign publishing.publications.r5SubscriptionBackport
 }
