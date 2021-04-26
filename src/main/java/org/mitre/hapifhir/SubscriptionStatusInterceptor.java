@@ -87,7 +87,13 @@ public class SubscriptionStatusInterceptor {
         return true;
     }
 
-    private Subscription getSubscription(HttpServletResponse theResponse, String id) {
+    /**
+     * Retrieves the subscription for the corresponding resource id
+     *
+     * @param id - the id of the resource to retrieve
+     * @return the subscription resource if it exists or null otherwise
+     */
+    private Subscription getSubscription(String id) {
         Bundle results = searchClient.searchOnCriteria("Subscription/" + id);
         for (BundleEntryComponent entry: results.getEntry()) {
             Resource resource = entry.getResource();
@@ -98,7 +104,14 @@ public class SubscriptionStatusInterceptor {
         return null;
     }
 
+    /**
+     * Create and populate the parameter resource for the subscription
+     *
+     * @param subscription - the subscription to base the parameter on
+     * @return the status parameter
+     */
     private Parameters makeParameter(Subscription subscription) {
+        // TODO: Update Parameter to use real values from the subscription
         Parameters status = new Parameters();
         Meta meta = new Meta();
         meta.addProfile("http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-subscriptionstatus");
