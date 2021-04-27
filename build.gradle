@@ -1,0 +1,122 @@
+plugins {
+    id 'java-library'
+    id 'checkstyle'
+    id 'maven-publish'
+    id 'signing'
+}
+
+// stick to java 8
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+repositories {
+    // Use JCenter for resolving dependencies.
+    jcenter()
+}
+
+checkstyle {
+    toolVersion '8.4'
+}
+
+dependencies {
+    // This dependency is exported to consumers, that is to say found on their compile classpath.
+    api 'javax.annotation:javax.annotation-api:1.3.2'
+    api 'javax.servlet:javax.servlet-api:3.1.0'
+	api 'org.springframework:spring-web:5.2.1.RELEASE'
+	api 'org.json:json:20190722'
+	
+    api 'ca.uhn.hapi.fhir:hapi-fhir-base:4.1.0'
+    api 'ca.uhn.hapi.fhir:hapi-fhir-client:4.1.0'
+	api 'ca.uhn.hapi.fhir:hapi-fhir-server:4.1.0'
+	api 'ca.uhn.hapi.fhir:hapi-fhir-structures-r4:4.1.0'
+
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+
+    // This dependency is used internally, and not exposed to consumers on their own compile classpath.
+    // implementation 'com.google.guava:guava:29.0-jre'
+
+    // Use JUnit test framework.
+    testImplementation 'junit:junit:4.13'
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier "javadoc"
+    from javadoc.destinationDir
+}
+
+task sourceJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives jar
+    archives sourceJar
+    archives javadocJar
+}
+
+def mavenGroup = 'org.mitre.hapifhir'
+def mavenVersion = '0.0.1'
+
+publishing {
+    publications {
+        r5SubscriptionBackport(MavenPublication) {
+            groupId mavenGroup
+            version mavenVersion
+            from components.java
+
+            artifact(sourceJar) {
+                classifier = 'sources'
+            }
+            artifact(javadocJar) {
+                classifier = 'javadoc'
+            }
+            pom {
+                name = 'HAPI R5 Subscription Backport Helper'
+                description = 'R5 Subscription Backport Utilities for HAPI FHIR'
+                url = 'https://github.com/mcode/r5-subscription-backport'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/mcode/r5-subscription-backport.git'
+                    developerConnection = 'scm:git:ssh://github.com:mcode/r5-subscription-backport.git'
+                    url = 'http://github.com/mcode/r5-subscription-backport/tree/master'
+                }
+                developers {
+                    developer {
+                        name = 'Dylan Hall'
+                        email = 'dehall@mitre.org'
+                        organization = 'The MITRE Corporation'
+                        organizationUrl = 'http://www.mitre.org/'
+                    }
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            def snapshotUrl = 'https://oss.sonatype.org/content/repositories/snapshots'
+            def releaseUrl = 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
+            url mavenVersion.endsWith('SNAPSHOT') ? snapshotUrl : releaseUrl
+            credentials {
+                def user = project.hasProperty('ossrhUsername') ? ossrhUsername : ''
+                def pw = project.hasProperty('ossrhPassword') ? ossrhPassword : ''
+                username user
+                password pw 
+            }
+        }
+    }
+}
+
+signing {
+  required { project.hasProperty('signingKey') }
+  def signingKey = findProperty("signingKey")
+  def signingPassword = findProperty("signingPassword")
+  useInMemoryPgpKeys(signingKey, signingPassword)
+  sign publishing.publications.r5SubscriptionBackport
+}
