@@ -125,12 +125,13 @@ public class SubscriptionInterceptor {
             List<SubscriptionTopic> matchedSubscriptionTopics = 
               getSubscriptionTopics(theRequestDetails, theResource);
             if (!matchedSubscriptionTopics.isEmpty()) { 
+                Bundle results = this.serverClient.searchOnCriteria("Subscription?status=active");
                 for (SubscriptionTopic subscriptionTopic : matchedSubscriptionTopics) {
                     myLogger.info("Checking subscriptions for topic " + subscriptionTopic.getName());
                     // Find all subscriptions to be notified
                     Resource resource = (Resource) theResource;
                     String topicUrl = subscriptionTopic.getTopicUrl();
-                    for (Subscription subscription: getSubscriptionsToNotify(topicUrl, resource)) {
+                    for (Subscription subscription: getSubscriptionsToNotify(topicUrl, resource, results)) {
                         Bundle notification = CreateNotification.createResourceNotification(subscription,
                           Collections.singletonList(resource), this.baseUrl, topicUrl,
                           NotificationType.EVENT_NOTIFICATION);
@@ -200,13 +201,14 @@ public class SubscriptionInterceptor {
      * 
      * @param topicUrl - the topic url to find subscriptions for
      * @param theResource - the triggering resource used to check subscription criteria
+     * @param allSubscriptions - bundle containing a list of all the active subscriptions
      * @return list of Subscription resource
      */
-    private List<Subscription> getSubscriptionsToNotify(String topicUrl, Resource theResource) {
+    private List<Subscription> getSubscriptionsToNotify(String topicUrl, Resource theResource, 
+      Bundle allSubscriptions) {
         myLogger.info("Checking all active subscriptions for topic " + topicUrl);
-        Bundle results = this.serverClient.searchOnCriteria("Subscription?status=active");
         List<Subscription> subscriptions = new ArrayList<>(); 
-        for (BundleEntryComponent entry: results.getEntry()) {
+        for (BundleEntryComponent entry: allSubscriptions.getEntry()) {
             Resource resource = entry.getResource();
             if (!resource.getResourceType().equals(ResourceType.Subscription)) {
                 continue;
