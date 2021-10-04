@@ -10,14 +10,14 @@ This project can be added to an existing Maven-based project, add this dependenc
 <dependency>
   <groupId>org.mitre.hapifhir</groupId>
   <artifactId>r5-subscription-backport</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
 </dependency>
 ```
 
 Or for a Gradle-based project, add this to `build.gradle`:
 
 ```
-compile 'org.mitre.hapifhir:r5-subscription-backport:0.0.1'
+compile 'org.mitre.hapifhir:r5-subscription-backport:0.0.2'
 
 ```
 

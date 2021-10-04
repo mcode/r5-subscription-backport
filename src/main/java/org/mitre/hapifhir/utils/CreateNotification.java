@@ -49,7 +49,7 @@ public class CreateNotification {
         subscriptionStatusComponent.setFullUrl("urn:uuid:" + parametersId);
 
         Bundle notificationBundle = new Bundle();
-        notificationBundle.setType(BundleType.DOCUMENT);
+        notificationBundle.setType(BundleType.HISTORY);
         notificationBundle.setMeta(meta);
         notificationBundle.setTimestamp(new Date());
         notificationBundle.addEntry(subscriptionStatusComponent);
